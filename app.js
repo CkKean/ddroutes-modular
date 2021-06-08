@@ -40,7 +40,6 @@ app.use(express.json());
 app.use(express.urlencoded({extended: false}));
 app.use(cors());
 app.use(cookieParser());
-// app.use(express.static(path.join(__dirname, 'public')));
 
 const baseUrl = "/ddroutes-modular";
 app.use(baseUrl + '/auth', authRouter);

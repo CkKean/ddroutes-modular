@@ -4,12 +4,12 @@ const multer = require("multer");
 const fs = require("fs");
 const generateDateTime = require("../../utils/unique-date-time.util");
 const AuthController = require("../auth/auth.controller");
-const AccountMiddleware = require("../../middleware/account/accountmiddleware");
 const {Op} = require("sequelize");
 const {EmployeePositionConstant} = require("../../constant/employee-position.constant");
 const {UserTypeConstant} = require("../../constant/user-type.constant");
 const {IMAGE_PATH} = require("../../constant/routes.constant");
 const statusModel = new StatusModel();
+const {v4: uuidv4} = require('uuid');
 
 findAllStaff = (req, res) => {
     User.findAll(
@@ -97,6 +97,7 @@ findAllCourierPersonnel = (req, res) => {
 
 createStaff = async (req, res) => {
 
+    let userId = uuidv4();
     let userData = JSON.parse(req.body.user);
     userData.createdBy = req.userId;
     AuthController.signUpFieldsValidation(userData, res);
@@ -108,6 +109,7 @@ createStaff = async (req, res) => {
         userData.profileImg = req.file.filename;
         userData.profileImgPath = '/' + req.file.destination.split('/')[1];
     }
+    userData.userId = userId;
     userData.createdDT = new Date();
 
     User.create(userData).then(user => {
@@ -239,7 +241,7 @@ const UserController = {
     updateStaff: updateStaff,
     findAllStaffByPosition: findAllStaffByPosition,
     findAllCourierPersonnel: findAllCourierPersonnel,
-    findUserInformation:findUserInformation,
+    findUserInformation: findUserInformation,
     uploadFile: uploadFile
 };
 
