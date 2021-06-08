@@ -57,7 +57,6 @@ app.use(baseUrl + '/company-address', companyAddressRoute);
 app.use(baseUrl + '/task-proof', taskProofRoute);
 app.use(baseUrl + '/dashboard', dashboardRoute);
 
-
 app.use(function (err, req, res, next) {
     // set locals, only providing error in development
     console.log("Error:  ", req.app.get('env') === 'development' ? err : {});
