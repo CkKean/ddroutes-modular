@@ -43,6 +43,7 @@ signup = (req, res) => {
 };
 
 signin = (req, res) => {
+    console.log(req.body);
     const statusModel = new StatusModel();
     User.findOne({
         where: {

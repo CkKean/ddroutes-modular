@@ -3,28 +3,30 @@ const {
     DB_USERNAME,
     DB_PASSWORD,
     DB_DATABASE,
-    DB_DEV_HOST,
-    DB_DEV_USERNAME,
-    DB_DEV_PASSWORD,
-    DB_DEV_DATABASE
 } = process.env;
 
 const model = require("../model");
 
+const DB_DEV_HOST = "us-cdbr-east-04.cleardb.com"
+const DB_DEV_USERNAME = "bd25f8f1af39c6"
+const DB_DEV_PASSWORD = "02a3fa60"
+const DB_DEV_DATABASE = "heroku_3d67ae1496f0ac0"
+
 const Sequelize = require("sequelize");
 const sequelize = new Sequelize(
-    DB_DEV_DATABASE, //Database
-    DB_DEV_USERNAME, //Username
-    DB_DEV_PASSWORD, // Password
+    "heroku_3d67ae1496f0ac0", //Database
+    "bd25f8f1af39c6", //Username
+    "02a3fa60", // Password
     {
-        host: DB_DEV_HOST,
+        host: "us-cdbr-east-04.cleardb.com",
         dialect: "mysql",
-        operatorAliases: false,
-        timezone: '+08:00',
         dialectOptions: {
             options: {
                 useUTC: false, // for reading from database
             },
+        },
+        pool: {
+            connectionLimit: 20
         },
     }
 );
