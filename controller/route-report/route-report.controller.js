@@ -174,7 +174,6 @@ verifyRouteReport = async (routeReportId) => {
 }
 
 calculatePetrolFeeAndUsage = (distance, fuelConsumption, latestPetrolPrice) => {
-    console.log(distance, fuelConsumption, latestPetrolPrice);
     if (distance && fuelConsumption && latestPetrolPrice) {
         const totalConsumedLitres = (distance * fuelConsumption) / 100;
         const fuelCost = totalConsumedLitres * latestPetrolPrice;

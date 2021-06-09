@@ -18,21 +18,6 @@ getGeoCoding = async (address) => {
     } catch (error) {
         console.log(error);
     }
-
-    // const headers = {
-    //     "Content-Type": "application/json",
-    // }
-    // fetch(url, {method: 'GET', headers: headers})
-    //     .then((response) => {
-    //         return response.json();
-    //     })
-    //     .then((data) => {
-    //         console.log(data.results[0].geometry.location.lat);
-    //         console.log(data.results[0].geometry.location.lng);
-    //         return res.json(data);
-    //     }).catch(error => {
-    //     console.log("Error: ", error.message);
-    // });
 }
 
 getDistance = async (req, res) => {
@@ -44,9 +29,6 @@ getDistance = async (req, res) => {
     try {
         const response = await fetch(url);
         const data = await response.json();
-        console.log(origin);
-        console.log(destination);
-        console.log(data);
 
         if (data.status === "OK") {
             return {
@@ -139,8 +121,6 @@ getTotalDistanceTime = async (orderList) => {
     const parseData = await data.json()
 
     console.log(parseData);
-    console.log(parseData.routes[0].duration);
-    console.log(parseData.routes[0].distance);
 
     const totalDistanceTime = {
         totalDistance: parseData.routes[0].distance / 1000,
@@ -165,8 +145,6 @@ calcOrderTotalDistanceTime = async (totalDistanceModel) => {
         orderList.push(companyAddressCoordinate);
     }
 
-    console.log(orderList);
-
     const baseUrl = "https://api.mapbox.com/directions/v5/mapbox/driving/";
     let coordinateList = "";
     for (let i in orderList) {
@@ -180,11 +158,6 @@ calcOrderTotalDistanceTime = async (totalDistanceModel) => {
     const data = await fetch(apiURL).catch(err => console.log("Total Distance Time: ", err.message));
     const parseData = await data.json();
     console.log(parseData);
-    console.log("Total Distance: ", {
-        totalDistance: parseData.routes[0].distance / 1000,
-        totalDuration: parseData.routes[0].duration
-    });
-
     const totalDistanceTime = {
         totalDistance: parseData.routes[0].distance / 1000,
         totalDuration: (parseData.routes[0].duration / 60).toFixed(0)

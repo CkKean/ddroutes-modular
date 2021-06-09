@@ -2,7 +2,6 @@ const StatusModel = require("../../model/status.model");
 const generateUniqueId = require("../../utils/unique-id.util");
 const PricePlan = require("../../config/database").pricePlan;
 const statusModel = new StatusModel();
-const User = require("../../config/database").user;
 
 findAll = async (req, res) => {
     const pricePlan = await PricePlan.findAll({

@@ -6,34 +6,51 @@ const {
 } = process.env;
 
 const model = require("../model");
-
-const DB_DEV_HOST = "us-cdbr-east-04.cleardb.com"
-const DB_DEV_USERNAME = "bd25f8f1af39c6"
-const DB_DEV_PASSWORD = "02a3fa60"
-const DB_DEV_DATABASE = "heroku_3d67ae1496f0ac0"
-
 const Sequelize = require("sequelize");
-const sequelize = new Sequelize(
-    "heroku_3d67ae1496f0ac0", //Database
-    "bd25f8f1af39c6", //Username
-    "02a3fa60", // Password
-    {
-        host: "us-cdbr-east-04.cleardb.com",
-        dialect: "mysql",
-        dialectOptions: {
-            options: {
-                useUTC: false, // for reading from database
-            },
-        },
-        pool: {
-            connectionLimit: 20
-        },
-    }
-);
 
 const db = {};
 db.Sequelize = Sequelize;
-db.sequelize = sequelize;
+let sequelize;
+
+if (process.env.NODE_ENV === "development") {
+    sequelize = new Sequelize(
+        DB_DATABASE, //Database
+        DB_USERNAME, //Username
+        DB_PASSWORD, // Password
+        {
+            host: DB_HOST,
+            dialect: "mysql",
+            operatorAliases: false,
+            timezone: '+08:00',
+            pool: {
+                connectionLimit: 10
+            },
+        },
+    );
+    db.sequelize = sequelize;
+    console.log("Development Database Configuration");
+} else {
+    sequelize = new Sequelize(
+        "heroku_3d67ae1496f0ac0", //Database
+        "bd25f8f1af39c6", //Username
+        "02a3fa60", // Password
+        {
+            host: "us-cdbr-east-04.cleardb.com",
+            dialect: "mysql",
+            dialectOptions: {
+                options: {
+                    useUTC: false, // for reading from database
+                },
+            },
+            pool: {
+                connectionLimit: 10
+            },
+        }
+    );
+
+    db.sequelize = sequelize;
+    console.log("Production Database Configuration");
+}
 
 db.user = model.User(sequelize, Sequelize);
 db.vehicle = model.Vehicle(sequelize, Sequelize);

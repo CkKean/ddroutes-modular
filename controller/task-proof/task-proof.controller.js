@@ -15,7 +15,6 @@ const {Op} = require("sequelize");
 const {
     getOrderTypeRouteId,
     sortOrder,
-    getOrderListAddress,
     getOrderListAddressOnRoute
 } = require("../order-route/order-route-helper");
 
@@ -138,7 +137,6 @@ createTaskProofService = async (courierUpdate, orderNo, taskProof, res) => {
 }
 
 checkFinishTask = async (routeId, userId, res) => {
-    console.log(routeId);
     const orderList = await CourierOrder.findAll({
         where: {
             [Op.or]: [

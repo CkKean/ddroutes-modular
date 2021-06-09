@@ -8,7 +8,7 @@ const User = db.user;
 verifyToken = (req, res, next) => {
     const bearerHeader = req.headers['authorization'];
     const token = bearerHeader && bearerHeader.split(" ")[1];
-    if (!token || token == null) {
+    if (!token) {
         return res.status(401).send({
             message: "No token provided!"
         });
@@ -34,7 +34,7 @@ isSuperAdmin = (req, res, next) => {
             message: "Require Admin Role.",
             status: "access.denied"
         });
-        return;
+
     })
 };
 
@@ -48,7 +48,7 @@ isStaff = (req, res, next) => {
             message: "Require Staff Role.",
             status: "access.denied"
         });
-        return;
+
     })
 };
 
@@ -63,7 +63,7 @@ requireStaffOrSuperAdmin = (req, res, next) => {
             message: "Require Staff or Super Admin Role.",
             status: "access.denied"
         });
-        return;
+
     })
 };
 
@@ -77,7 +77,7 @@ requireCourierPersonnelOrSuperAdmin = (req, res, next) => {
             message: "Require Staff role and position Courier Personnel.",
             status: "access.denied"
         });
-        return;
+
     })
 }
 
@@ -92,7 +92,7 @@ isNormalUser = (req, res, next) => {
             message: "Require User Role!",
             status: "access.denied"
         });
-        return;
+
     })
 };
 

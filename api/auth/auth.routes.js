@@ -12,8 +12,6 @@ router.post('/signup', AccountMiddleware.checkDuplicateUsername, AuthController.
 
 router.post('/signin', AuthController.signin);
 
-router.post('/refresh-token', AuthController.refreshToken);
-
 router.post('/mobile/signin', AuthController.mobileSignIn);
 
 module.exports = router;

@@ -8,8 +8,6 @@ const {EmployeePositionConstant} = require("../../constant/employee-position.con
 const {Op} = require("sequelize");
 const statusModel = new StatusModel();
 
-const refreshTokens = {};
-
 signup = (req, res) => {
 
     signUpFieldsValidation(req.body);
@@ -43,7 +41,6 @@ signup = (req, res) => {
 };
 
 signin = (req, res) => {
-    console.log(req.body);
     const statusModel = new StatusModel();
     User.findOne({
         where: {
@@ -53,7 +50,7 @@ signin = (req, res) => {
             exclude: ["startDate", "position", "createdDT", "createdBy"]
         }
     }).then(user => {
-        if (!user || user == null) {
+        if (!user) {
             return res.json(statusModel.failed({
                 message: "User Not Found!"
             }));
@@ -70,16 +67,11 @@ signin = (req, res) => {
         const token = jwt.sign({id: user.userId}, config.secret, {
             expiresIn: 86400 // 15 Minutes
         });
-        const refreshToken = jwt.sign({id: user.userId}, config.refreshTokenSecret, {
-            expiresIn: 86400 //1 day
-        })
-        refreshTokens[refreshToken] = user.userId;
 
         res.json(statusModel.success({
             username: user.username,
             userType: user.userType,
             jwtToken: token,
-            refreshToken: refreshToken,
             expiresIn: 86400,
             userInformation: user
         }));
@@ -117,12 +109,7 @@ mobileSignIn = (req, res) => {
         const token = jwt.sign({id: user.userId}, config.secret, {
             expiresIn: 86400 // 15 Minutes
         });
-        const refreshToken = jwt.sign({id: user.userId}, config.refreshTokenSecret, {
-            expiresIn: 86400 //1 day
-        })
-        refreshTokens[refreshToken] = user.userId;
 
-        console.log(user.fullName);
         res.json(statusModel.success({
             username: user.username,
             fullname: user.fullName,
@@ -132,36 +119,11 @@ mobileSignIn = (req, res) => {
             profileImg: user.profileImg ? user.profileImg : null,
             profileImgPath: user.profileImgPath ? user.profileImgPath : null,
             jwtToken: token,
-            refreshToken: refreshToken,
             expiresIn: 86400,
         }));
 
     }).catch(err => {
         res.status(500).send({message: err.message});
-    });
-}
-
-refreshToken = (req, res) => {
-    const token = req.body.refreshToken;
-
-    if (!token) {
-        return res.sendStatus(401);
-    }
-
-    if (!refreshTokens.includes(token)) {
-        return res.sendStatus(403);
-    }
-    jwt.verify(token, config.refreshTokenSecret, (err, user) => {
-        if (err) {
-            return res.sendStatus(403);
-        }
-        const accessToken = jwt.sign({id: user.userId}, config.refreshTokenSecret, {
-            expiresIn: 900 // 15 min
-        })
-
-        res.json({
-            accessToken
-        });
     });
 }
 
@@ -259,7 +221,6 @@ const AuthController = {
     validateEmail: validateEmail,
     signup: signup,
     signin: signin,
-    refreshToken: refreshToken,
     mobileSignIn: mobileSignIn
 };
 

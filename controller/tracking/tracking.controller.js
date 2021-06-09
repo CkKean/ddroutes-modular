@@ -103,10 +103,10 @@ findAllByTrackingOrderNo = async (req, res) => {
                 },
                 raw: true
             });
-            console.log(deliveryOrderRoute);
+
             if (deliveryOrderRoute) {
                 const deliveryTaskProof = await TaskProof.findOne({where: {proofId: courierOrder.proofId}, raw: true});
-                console.log(deliveryTaskProof);
+
                 orderShippedAt = deliveryOrderRoute.startedAt;
                 step = 2;
                 if(deliveryTaskProof){
@@ -122,8 +122,6 @@ findAllByTrackingOrderNo = async (req, res) => {
                 }
             }
         }
-
-        console.log(deliveryReason);
 
         let trackingData = {
             orderStatus: courierOrder.orderStatus, // Pending, In progress, Completed
@@ -142,7 +140,6 @@ findAllByTrackingOrderNo = async (req, res) => {
             orderPickedAt: orderPickedAt,
             orderCompletedAt: orderCompletedAt
         };
-        console.log(trackingData);
 
         return res.json(statusModel.success(trackingData));
 

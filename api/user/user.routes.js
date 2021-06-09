@@ -4,7 +4,6 @@ const router = express.Router();
 const UserController = require("../../controller/user/user.controller");
 const AuthMiddleware = require("../../middleware/auth/authmiddleware");
 
-
 router.get('/find-all', AuthMiddleware.verifyToken, AuthMiddleware.isSuperAdmin, UserController.findAllStaff);
 router.get('/find', AuthMiddleware.verifyToken, AuthMiddleware.isSuperAdmin, UserController.findOne);
 router.post('/create', AuthMiddleware.verifyToken, AuthMiddleware.isSuperAdmin,

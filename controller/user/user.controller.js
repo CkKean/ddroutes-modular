@@ -162,9 +162,6 @@ updateStaff = async (req, res) => {
         userData.profileImgPath = null;
     }
 
-    console.log(req.file);
-    console.log(userData);
-
     User.update(userData,
         {
             where: {

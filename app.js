@@ -56,6 +56,8 @@ app.use(baseUrl + '/company-address', companyAddressRoute);
 app.use(baseUrl + '/task-proof', taskProofRoute);
 app.use(baseUrl + '/dashboard', dashboardRoute);
 
+console.log("Port: ",process.env.PORT);
+console.log("Mode: ",process.env.NODE_ENV);
 app.use(function (err, req, res, next) {
     // set locals, only providing error in development
     console.log("Error:  ", req.app.get('env') === 'development' ? err : {});

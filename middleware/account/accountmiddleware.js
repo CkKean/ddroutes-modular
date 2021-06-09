@@ -11,7 +11,7 @@ checkDuplicateUsername = (req, res, next) => {
     }).then(user => {
         if (user) {
             res.json(
-                statusModel.failed({message: "Failed! Username is already in use!"})
+                statusModel.failed({message: "Failed! Username is already in use."})
             );
             return;
         }

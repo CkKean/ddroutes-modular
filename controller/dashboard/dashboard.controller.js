@@ -14,7 +14,7 @@ findAll = async (req, res) => {
     const courierOrder = await CourierOrder.findAll();
     let todayTodayOrder = 0;
     for (let order of courierOrder) {
-        if (order.createdAt.toLocaleDateString() == today) {
+        if (order.createdAt.toLocaleDateString() === today) {
             todayTodayOrder += 1;
         }
     }
@@ -42,8 +42,6 @@ findAll = async (req, res) => {
         totalPersonnel: personnel.length
     };
 
-
-    console.log(dashboardModel);
     return res.json(statusModel.success(dashboardModel));
 }
 
