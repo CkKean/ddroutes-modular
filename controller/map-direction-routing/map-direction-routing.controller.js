@@ -24,12 +24,13 @@ getDistance = async (req, res) => {
     const BASE_URL = "https://maps.googleapis.com/maps/api/distancematrix/json?units=metric";
     let origin = req.body.fullSenderAddress;
     let destination = req.body.fullRecipientAddress;
-
     const url = BASE_URL + "&origins=" + origin + "&destinations=" + destination + "&key=" + google_api_key;
     try {
+        console.log(url);
+
         const response = await fetch(url);
         const data = await response.json();
-
+        console.log(data);
         if (data.status === "OK") {
             return {
                 distanceValue: data.rows[0].elements[0].distance.value,
@@ -42,6 +43,7 @@ getDistance = async (req, res) => {
         }
     } catch (error) {
         console.log(error);
+        return null;
     }
 }
 

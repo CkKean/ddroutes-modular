@@ -242,7 +242,10 @@ calculateShippingCost = async (req, res) => {
 
     const pricePlanList = await PricePlan.findAll({raw: true});
     const distance = await MapDirectionRoutingController.getDistance(req);
+    if (!distance) {
+        return res.json(statusModel.failed({message: "Server error. Please try again later."}));
 
+    }
     const pricePlan = pricePlanList.filter(p => p.vehicleType === vehicleType)[0];
 
     let shippingCost = pricePlan.defaultPricing;
