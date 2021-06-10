@@ -1,6 +1,7 @@
 const fetch = require("node-fetch");
-const {google_api_key} = process.env;
-const {mapbox_api_key} = process.env;
+
+const google_api_key = "AIzaSyB0aRG_lW_Ll2yRrmF1TPMcMt-nyOozXEw";
+const mapbox_api_key = "pk.eyJ1IjoiY2hlZWtlYW4xOTk3IiwiYSI6ImNrbXoxa3I4MDA1bTkydmwydWtyMWoxZmgifQ.QiM6rCDgQTh5nNVFUO9CAA"
 
 getGeoCoding = async (address) => {
     const BASE_URL = "https://maps.googleapis.com/maps/api/geocode/json?address=";
@@ -30,7 +31,6 @@ getDistance = async (req, res) => {
 
         const response = await fetch(url);
         const data = await response.json();
-        console.log(data);
         if (data.status === "OK") {
             return {
                 distanceValue: data.rows[0].elements[0].distance.value,
@@ -39,10 +39,11 @@ getDistance = async (req, res) => {
                 durationText: data.rows[0].elements[0].duration.text
             }
         } else {
+            console.log("Error", data);
             return null;
         }
     } catch (error) {
-        console.log(error);
+        console.log("Error", error.message);
         return null;
     }
 }
@@ -159,7 +160,10 @@ calcOrderTotalDistanceTime = async (totalDistanceModel) => {
     const apiURL = baseUrl + coordinateList + "?overview=false&alternatives=false&steps=true&access_token=" + mapbox_api_key;
     const data = await fetch(apiURL).catch(err => console.log("Total Distance Time: ", err.message));
     const parseData = await data.json();
-    console.log(parseData);
+    if (parseData === null) {
+        console.log(parseData);
+        return null;
+    }
     const totalDistanceTime = {
         totalDistance: parseData.routes[0].distance / 1000,
         totalDuration: (parseData.routes[0].duration / 60).toFixed(0)
