@@ -79,6 +79,7 @@ getOrderListAddress = (courierOrderList) => {
                 ...getOrderRecipientInfo(order),
                 displayOrderType: displayOrderType,
 
+
             });
         }
     }
