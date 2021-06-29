@@ -204,6 +204,10 @@ module.exports = (sequelize, Sequelize) => {
             updatedAt: {
                 type: Sequelize.DATE,
                 field: "updated_at"
+            },
+            estArriveTime: {
+                type: Sequelize.INTEGER,
+                field: "est_arrive_time"
             }
         },
         {

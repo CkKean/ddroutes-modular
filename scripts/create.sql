@@ -164,7 +164,8 @@ CREATE TABLE COURIER_ORDER
     created_by                  varchar(255) REFERENCES User (user_id),
     created_at                  DATETIME       NOT NULL,
     updated_by                  varchar(255) REFERENCES User (user_id),
-    updated_at                  DATETIME
+    updated_at                  DATETIME,
+    estArriveTime               int
 );
 
 CREATE TABLE ROUTE_REPORT

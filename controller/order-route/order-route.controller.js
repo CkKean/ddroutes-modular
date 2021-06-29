@@ -16,7 +16,8 @@ const {
     getOrderTypeRouteId,
     sortOrder,
     getOrderListAddress,
-    getOrderListAddressOnRoute
+    getOrderListAddressOnRoute,
+    convertSecondToDHM
 } = require("./order-route-helper");
 const {OrderTypeConstant} = require("../../constant/order-type.constant");
 
@@ -70,6 +71,11 @@ findAll = async (req, res) => {
             }
         }
         const displayOrderList = getOrderListAddressOnRoute(sortedOrderList, route.routeId);
+        const orderListCount = displayOrderList.length;
+        let totalServiceTime = orderListCount * (60 * 3); // 3 min service time
+        let totalEstTimeUsed = +route.timeNeeded + totalServiceTime;
+
+        route.timeNeeded = convertSecondToDHM(totalEstTimeUsed);
 
         route.dataValues.completed = completed;
         route.dataValues.orderList = sortedOrderList;
@@ -788,8 +794,8 @@ autoOptimizeRoute = async (req, res) => {
     } else {
         return res.json(statusModel.failed({message: "Optimization type does not exist."}));
     }
-
 }
+
 
 updateOrderRouteDistance = async (data, transaction) => {
 
