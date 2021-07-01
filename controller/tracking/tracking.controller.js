@@ -57,8 +57,8 @@ findAllByTrackingOrderNo = async (req, res) => {
                     where: {proofId: courierOrder.pickupProofId},
                     raw: true
                 });
+                orderShippedAt = pickupOrderRoute.startedAt;
                 if (pickupOrderRoute.status === OrderStatusConstant.IN_PROGRESS) {
-                    orderShippedAt = pickupOrderRoute.startedAt;
                     step = 2;
                 }
                 if (pickUpTaskProof) {
@@ -83,8 +83,8 @@ findAllByTrackingOrderNo = async (req, res) => {
                         where: {proofId: courierOrder.proofId},
                         raw: true
                     });
+                    orderShippedAt = deliveryOrderRoute.startedAt;
                     if (deliveryOrderRoute.status === OrderStatusConstant.IN_PROGRESS) {
-                        orderShippedAt = deliveryOrderRoute.startedAt;
                         step = 4;
                     }
                     if (deliveryTaskProof) {
@@ -109,9 +109,8 @@ findAllByTrackingOrderNo = async (req, res) => {
 
             if (deliveryOrderRoute) {
                 const deliveryTaskProof = await TaskProof.findOne({where: {proofId: courierOrder.proofId}, raw: true});
-
+                orderShippedAt = deliveryOrderRoute.startedAt;
                 if (deliveryOrderRoute.status === OrderStatusConstant.IN_PROGRESS) {
-                    orderShippedAt = deliveryOrderRoute.startedAt;
                     step = 2;
                 }
 
