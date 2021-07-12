@@ -7,8 +7,12 @@ const User = require("../../config/database").user;
 const multer = require("multer");
 const fs = require("fs");
 const generateDateTime = require("../../utils/unique-date-time.util");
+const {Op} = require("sequelize");
+const {OrderTypeConstant} = require("../../constant/order-type.constant");
+const {OrderStatusConstant} = require("../../constant/order-status.constant");
+const sequelize = require("../../config/database").sequelize;
 
-const {getOrderListAddressOnRoute} = require("../order-route/order-route-helper");
+const {getOrderListAddressOnRoute, convertSecondToDHM, sortOrder} = require("../order-route/order-route-helper");
 const statusModel = new StatusModel();
 
 findAll = async (req, res) => {
@@ -49,7 +53,16 @@ findOne = async (req, res) => {
     });
     if (routeReport) {
         const courierOrder = await CourierOrder.findAll({
-            where: {routeId: routeReport.routeId}
+            where: {
+                [Op.or]: [
+                    {routeId: routeReport.routeId},
+                    {pickupRouteId: routeReport.routeId}
+                ]
+            },
+            order: [
+                ['sortId', 'ASC']
+            ],
+            raw: true
         });
         const orderRoute = await OrderRoute.findOne({
             where: {routeId: routeReport.routeId},
@@ -73,8 +86,15 @@ findOne = async (req, res) => {
                 attributes: ["vehicleId", "type", "plateNo", "fuelEfficiency", "fuelEfficiencyUnit", "owner", "brand", "model"]
             });
 
+        orderRoute.timeNeeded = convertSecondToDHM(orderRoute.timeNeeded);
+
+        if (orderRoute.status === OrderStatusConstant.COMPLETED) {
+            routeReport.totalTimeUsed = convertSecondToDHM((orderRoute.updatedAt.getTime() - orderRoute.startedAt.getTime()) / 1000);
+        }
+
         routeReport.orderRoute = orderRoute;
-        routeReport.orderList = getOrderListAddressOnRoute(courierOrder, routeReport.routeId);
+        const sortedOrderLIst = sortOrder(courierOrder, routeReport.routeId);
+        routeReport.orderList = getOrderListAddressOnRoute(sortedOrderLIst, routeReport.routeId);
         routeReport.vehicleInfo = vehicleInfo;
 
         return res.json(statusModel.success(routeReport));
@@ -98,19 +118,28 @@ updateRouteReport = async (req, res) => {
 
         const estimatedResult = calculatePetrolFeeAndUsage(+orderRoute.totalDistance, +orderRoute["vehicleInfo.fuelEfficiency"], +latestPetrolPrice);
 
-        if (req.file) {
-            routeReportData.statement = req.file.filename;
-            routeReportData.statementPath = '/' + req.file.destination.split('/')[1];
-        } else {
-            routeReportData.statement = null;
-            routeReportData.statementPath = null;
-        }
-
         routeReportData.updatedBy = req.userId;
         routeReportData.updatedAt = new Date();
         routeReportData.calculatedDistanceTravel = orderRoute.totalDistance;
         routeReportData.calculatedPetrolFees = estimatedResult.fuelCost;
         routeReportData.calculatedPetrolUsage = estimatedResult.totalConsumedLitres;
+
+        let removeOriPhoto = false;
+        if (req.file) {
+            routeReportData.statement = req.file.filename;
+            routeReportData.statementPath = '/' + req.file.destination.split('/')[1];
+            removeOriPhoto = true;
+        } else {
+            if (routeReport.statement == null || !routeReport.statement) {
+                routeReportData.statement = null;
+                routeReportData.statementPath = null;
+                removeOriPhoto = true;
+            } else {
+                routeReportData.statement = routeReport.profileImg;
+                routeReportData.statementPath = routeReport.profileImgPath;
+                removeOriPhoto = false;
+            }
+        }
 
         RouteReport.update(routeReportData, {
             where:
@@ -118,7 +147,7 @@ updateRouteReport = async (req, res) => {
                     routeReportId: routeReportData.routeReportId
                 }
         }).then(() => {
-            if (req.file && routeReport.statement && routeReport.statementPath) {
+            if (removeOriPhoto && routeReport.statement && routeReport.statementPath) {
                 const filePath = 'uploaded-files' + routeReport.statementPath + '/' + routeReport.statement;
                 try {
                     fs.unlinkSync(filePath);
@@ -126,6 +155,8 @@ updateRouteReport = async (req, res) => {
                     return res.json(statusModel.failed({message: err.message}));
                 }
             }
+
+
             return res.json(statusModel.success("Route report has been updated."));
 
         }).catch(err => {
@@ -138,13 +169,74 @@ updateRouteReport = async (req, res) => {
 
 deleteRouteReport = async (req, res) => {
     const routeReport = await verifyRouteReport(req.query.routeReportId);
+    if (!routeReport) {
+        return res.json(statusModel.failed({message: "Order route report does not exist."}));
+    }
+    const orderRoute = await OrderRoute.findOne({where: {routeId: routeReport.routeId}, raw: true});
 
-    if (routeReport) {
-        RouteReport.destroy({
-            where: {
-                routeReportId: req.query.routeReportId,
-            }
-        }).then(() => {
+    if (orderRoute.status === OrderStatusConstant.READY) {
+        let routeId = orderRoute.routeId;
+        let transaction;
+        try {
+            transaction = await sequelize.transaction();
+
+            await RouteReport.destroy({
+                where: {
+                    routeReportId: req.query.routeReportId,
+                },
+                transaction: transaction
+            });
+
+            //Delivery Order
+            await CourierOrder.update({
+                    routeId: null, sortId: null, orderStatus: OrderStatusConstant.PENDING, estArriveTime: null
+                }, {
+                    where: {
+                        [Op.and]: [
+                            {routeId: routeId},
+                            {orderType: OrderTypeConstant.DELIVERY}
+                        ]
+                    }, transaction: transaction
+                }
+            );
+
+            // Pickup Order
+            await CourierOrder.update({
+                    routeId: null,
+                    sortId: null,
+                    pickupOrderStatus: OrderStatusConstant.PENDING,
+                    estArriveTime: null
+
+                }, {
+                    where: {
+                        [Op.and]: [
+                            {routeId: routeId},
+                            {orderType: OrderTypeConstant.PICK_UP},
+                            {isPickedUp: false}
+                        ]
+                    }, transaction: transaction
+                }
+            );
+
+            // Pickedup Order
+            await CourierOrder.update({
+                    routeId: null,
+                    sortId: null,
+                    orderStatus: OrderStatusConstant.PICKED_UP,
+                    isPickedUp: true,
+                    estArriveTime: null
+                }, {
+                    where: {
+                        [Op.and]: [
+                            {routeId: routeId},
+                            {orderType: OrderTypeConstant.PICK_UP},
+                            {isPickedUp: true}
+                        ]
+                    }, transaction: transaction
+                }
+            );
+
+            await OrderRoute.destroy({where: {routeId: routeId}, transaction: transaction});
             if (routeReport.statement && routeReport.statementPath) {
                 const filePath = 'uploaded-files' + routeReport.statementPath + '/' + routeReport.statement;
                 try {
@@ -153,14 +245,15 @@ deleteRouteReport = async (req, res) => {
                     return res.json(statusModel.failed({message: err.message}));
                 }
             }
+            await transaction.commit();
             return res.json(statusModel.success("Route report record have been deleted."));
-        }).catch(err => {
-            return res.json(statusModel.failed({message: err.message}));
-        })
+        } catch (err) {
+            await transaction.rollback();
+            return res.json(statusModel.failed({message: "Order Route failed to delete."}));
+        }
     } else {
-        return res.json(statusModel.failed({message: "Order route report does not exist."}));
+        return res.json(statusModel.failed({message: "Order route already started. Unable to delete."}));
     }
-
 }
 
 verifyRouteReport = async (routeReportId) => {

@@ -111,6 +111,7 @@ createShippingOrder = async (req, res) => {
 
     let recipientGeocodingData = await MapDirectionRoutingController.getGeoCoding(req.body.fullRecipientAddress);
     let senderGeocodingData = await MapDirectionRoutingController.getGeoCoding(req.body.fullSenderAddress);
+
     req.body.orderId = orderId;
     req.body.orderNo = orderNo;
     req.body.trackingNo = trackingNo;

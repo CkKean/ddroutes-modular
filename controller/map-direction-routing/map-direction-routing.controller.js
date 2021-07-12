@@ -28,8 +28,6 @@ getDistance = async (req, res) => {
     let destination = req.body.fullRecipientAddress;
     const url = BASE_URL + "&origins=" + origin + "&destinations=" + destination + "&key=" + google_api_key;
     try {
-        console.log(url);
-
         const response = await fetch(url);
         const data = await response.json();
         if (data.status === "OK") {
@@ -77,6 +75,103 @@ getDistanceDuration = async (orderList) => {
         text: result.routes[0].legs[0].duration_in_traffic.text,
         value: result.routes[0].legs[0].duration_in_traffic.value,
     }
+}
+
+getTwoPathDuration = async (orderList) => {
+    let origin = orderList[0].recipientLatitude + "," + orderList[0].recipientLongitude;
+    let destination = orderList[orderList.length - 1].recipientLatitude + "," + orderList[orderList.length - 1].recipientLongitude;
+
+    const apiURL = "https://maps.googleapis.com/maps/api/directions/json?origin=" + origin +
+        "&destination=" + destination + "&departure_time=now&key=" + google_api_key;
+
+    const data = await fetch(apiURL).catch(err => {
+        console.log("Error: ", err.message)
+        return {
+            optimizeStatus: false,
+            message: err.message
+        }
+    });
+
+    const result = await data.json();
+
+    return {
+        text: result.routes[0].legs[0].duration_in_traffic.text,
+        value: result.routes[0].legs[0].duration_in_traffic.value,
+    }
+}
+
+calcOrderTotalDistanceTime = async (totalDistanceModel) => {
+
+    const orderList = totalDistanceModel.orderList;
+    const companyAddress = totalDistanceModel.companyAddress;
+    const roundTrip = totalDistanceModel.roundTrip;
+
+    let companyAddressCoordinate = {
+        recipientLongitude: companyAddress.longitude,
+        recipientLatitude: companyAddress.latitude
+    };
+    orderList.unshift(companyAddressCoordinate);
+    if (roundTrip) {
+        orderList.push(companyAddressCoordinate);
+    }
+
+    const trafficDuration = await getDistanceDuration(orderList);
+
+    const baseUrl = "https://api.mapbox.com/directions/v5/mapbox/driving/";
+    let coordinateList = "";
+    for (let i in orderList) {
+        coordinateList += orderList[i].recipientLongitude + "," + orderList[i].recipientLatitude;
+        if (i < (orderList.length - 1)) {
+            coordinateList += ";";
+        }
+    }
+    const apiURL = baseUrl + coordinateList + "?overview=full&annotations=distance,duration&alternatives=false&steps=true&access_token=" + mapbox_api_key;
+    const data = await fetch(apiURL).catch(err => console.log("Error: ", err.message));
+    const parseData = await data.json();
+
+    console.log(parseData);
+    console.log(parseData.routes[0].legs);
+    if (parseData === null) {
+        return null;
+    }
+
+    let i = 0;
+    for (i; i < (orderList.length - 1); i++) {
+        orderList[i + 1].estArriveTime = Math.ceil(parseData.routes[0].legs[i].duration)+3;
+        orderList[i + 1].estWaypointDistance = parseData.routes[0].legs[i].distance;
+    }
+    orderList.shift(companyAddressCoordinate);
+    if (roundTrip) {
+        orderList.pop(companyAddressCoordinate);
+    }
+
+    const totalDistanceTime = {
+        totalDistance: (parseData.routes[0].distance / 1000).toFixed(2),
+        totalDuration: trafficDuration.value,
+        orderList: orderList
+    };
+
+    return totalDistanceTime;
+}
+
+getDuration = async (req, res) => {
+    const orderList = req.body.orderList;
+    const companyAddress = req.body.companyAddress;
+    const roundTrip = req.body.roundTrip;
+
+    let companyAddressCoordinate = {
+        recipientLongitude: companyAddress.longitude,
+        recipientLatitude: companyAddress.latitude
+    };
+    orderList.unshift(companyAddressCoordinate);
+    if (roundTrip) {
+        orderList.push(companyAddressCoordinate);
+    }
+    const trafficDuration = await getDistanceDuration(orderList);
+
+    const statusModel = new StatusModel();
+
+    return res.json(statusModel.success(trafficDuration));
 }
 
 optimizeRoute = async (optimizeModel) => {
@@ -138,105 +233,15 @@ optimizeRoute = async (optimizeModel) => {
     };
 }
 
-getTotalDistanceTime = async (orderList) => {
-
-    const courierOrders = orderList;
-
-    const baseUrl = "https://api.mapbox.com/directions/v5/mapbox/driving/";
-    let coordinateList = "";
-    for (let i in courierOrders) {
-        coordinateList += courierOrders[i].recipientLongitude + "," + courierOrders[i].recipientLatitude;
-        if (i < (courierOrders.length - 1)) {
-            coordinateList += ";";
-        }
-    }
-    const apiURL = baseUrl + coordinateList + "?overview=false&alternatives=true&steps=true&access_token=" + mapbox_api_key;
-    const data = await fetch(apiURL).catch(err => console.log("Total Distance Time: ", err.message));
-    const parseData = await data.json()
-
-    console.log(parseData);
-
-    const totalDistanceTime = {
-        totalDistance: parseData.routes[0].distance / 1000,
-        totalDuration: parseData.routes[0].duration
-    };
-
-    return totalDistanceTime;
-}
-
-calcOrderTotalDistanceTime = async (totalDistanceModel) => {
-
-    const orderList = totalDistanceModel.orderList;
-    const companyAddress = totalDistanceModel.companyAddress;
-    const roundTrip = totalDistanceModel.roundTrip;
-
-    let companyAddressCoordinate = {
-        recipientLongitude: companyAddress.longitude,
-        recipientLatitude: companyAddress.latitude
-    };
-    orderList.unshift(companyAddressCoordinate);
-    if (roundTrip) {
-        orderList.push(companyAddressCoordinate);
-    }
-
-    const trafficDuration = await getDistanceDuration(orderList);
-
-    const baseUrl = "https://api.mapbox.com/directions/v5/mapbox/driving/";
-    let coordinateList = "";
-    for (let i in orderList) {
-        coordinateList += orderList[i].recipientLongitude + "," + orderList[i].recipientLatitude;
-        if (i < (orderList.length - 1)) {
-            coordinateList += ";";
-        }
-    }
-    const apiURL = baseUrl + coordinateList + "?overview=full&annotations=distance,duration&alternatives=false&steps=true&access_token=" + mapbox_api_key;
-    const data = await fetch(apiURL).catch(err => console.log("Error: ", err.message));
-    const parseData = await data.json();
-
-    console.log(parseData);
-    console.log(trafficDuration);
-    console.log(parseData.routes[0].legs);
-    if (parseData === null) {
-        return null;
-    }
-    const totalDistanceTime = {
-        totalDistance: (parseData.routes[0].distance / 1000).toFixed(2),
-        totalDuration: (trafficDuration.value),
-        totalTrafficDurationText: trafficDuration.text,
-        totalTrafficDurationValue: trafficDuration.value,
-    };
-
-    return totalDistanceTime;
-}
-
-getDuration = async (req, res) => {
-    const orderList = req.body.orderList;
-    const companyAddress = req.body.companyAddress;
-    const roundTrip = req.body.roundTrip;
-
-    let companyAddressCoordinate = {
-        recipientLongitude: companyAddress.longitude,
-        recipientLatitude: companyAddress.latitude
-    };
-    orderList.unshift(companyAddressCoordinate);
-    if (roundTrip) {
-        orderList.push(companyAddressCoordinate);
-    }
-    const trafficDuration = await getDistanceDuration(orderList);
-    console.log(orderList);
-    console.log(trafficDuration);
-    const statusModel = new StatusModel();
-
-    return res.json(statusModel.success(trafficDuration));
-}
 
 const MapDirectionRoutingController = {
     getGeoCoding: getGeoCoding,
     getDistance: getDistance,
     optimizeRoute: optimizeRoute,
-    getTotalDistanceTime: getTotalDistanceTime,
     calcOrderTotalDistanceTime: calcOrderTotalDistanceTime,
-    getDuration:getDuration,
+    getDuration: getDuration,
+    getTwoPathDuration: getTwoPathDuration,
+
 };
 
 module.exports = MapDirectionRoutingController;

@@ -17,7 +17,6 @@ router.post('/create', CourierOrderValidation.fieldsValidation, CourierOrderCont
 router.post('/delete', CourierOrderController.deleteCourierOrder);
 router.post('/update', CourierOrderValidation.updateFieldValidation, CourierOrderValidation.fieldsValidation, CourierOrderController.updateCourierOrder);
 router.post('/shipping-cost', CourierOrderController.calculateShippingCost);
-router.get('/total/distance-time', MapDirectionRoutingController.getTotalDistanceTime);
 router.get('/type', PricePlanController.findVehicleUniqueType);
 
 module.exports = router;

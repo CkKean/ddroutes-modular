@@ -10,6 +10,7 @@ const Vehicle = require("../../config/database").vehicle;
 const {OrderTypeConstant} = require("../../constant/order-type.constant");
 const statusModel = new StatusModel();
 const multer = require("multer");
+const MapDirectionRoutingController = require("../map-direction-routing/map-direction-routing.controller");
 const sequelize = require("../../config/database").sequelize;
 const {Op} = require("sequelize");
 const {
@@ -25,10 +26,40 @@ createFailedTaskProof = async (req, res) => {
     if (taskProof.status === OrderStatusConstant.PICKED_UP || taskProof.status === OrderStatusConstant.DELIVERED) {
         return res.json(statusModel.failed({message: "Task status is not match."}));
     }
-    const courierOrder = await CourierOrder.findOne({where: {orderNo: taskProof.orderNo}, raw: true});
+    const allCourierOrder = await CourierOrder.findAll({
+        where: {routeId: taskProof.routeId},
+        raw: true,
+        order: [
+            ["sortId", "ASC"]
+        ],
+    });
+
+    const courierOrder = allCourierOrder.filter((order) =>
+        order.orderNo === taskProof.orderNo
+    )[0];
+
     if (!courierOrder) {
         return res.json(statusModel.failed({message: "Courier order does not exists."}));
     }
+
+    let nextOrderEstTime;
+    let nextOrderNo;
+    let nextCourierUpdate;
+
+    if (allCourierOrder.length > 1 && (courierOrder.sortId < allCourierOrder.length)) {
+        const nextOrder = allCourierOrder.filter((order) =>
+            order.sortId === (courierOrder.sortId + 1)
+        )[0];
+        const courierOrderList = [courierOrder, nextOrder];
+        const displayOrderList = getOrderListAddressOnRoute(courierOrderList, taskProof.routeId);
+        nextOrderNo = nextOrder.orderNo;
+        nextOrderEstTime = await MapDirectionRoutingController.getTwoPathDuration(displayOrderList);
+        nextCourierUpdate = {
+            estArriveTime: nextOrderEstTime.value,
+            orderNo: nextOrderNo
+        };
+    }
+
 
     const taskProofId = generateUniqueId("TP");
 
@@ -46,7 +77,9 @@ createFailedTaskProof = async (req, res) => {
                     pickupOrderStatus: OrderStatusConstant.FAILED,
                     pickupProofId: taskProofId
                 };
-            } else { // Mean picked up and waiting for delivery
+            }
+        } else if (taskProof.status === OrderStatusConstant.NOT_DELIVERED) {
+            if (courierOrder.isPickedUp) {
                 courierUpdate = {
                     orderStatus: OrderStatusConstant.FAILED,
                     proofId: taskProofId
@@ -60,8 +93,7 @@ createFailedTaskProof = async (req, res) => {
     } else {
         return res.json(statusModel.failed({message: "Order type is missing."}));
     }
-    await createTaskProofService(courierUpdate, courierOrder.orderNo, taskProof, res);
-
+    await createTaskProofService(courierUpdate, courierOrder.orderNo, taskProof, nextCourierUpdate, res);
     await checkFinishTask(taskProof.routeId, userId, res);
 };
 
@@ -73,9 +105,39 @@ createTaskProofWithImage = async (req, res) => {
     if (taskProof.status === OrderStatusConstant.NOT_PICK_UP || taskProof.status === OrderStatusConstant.NOT_DELIVERED) {
         return res.json(statusModel.failed({message: "Task status is not match."}));
     }
-    const courierOrder = await CourierOrder.findOne({where: {orderNo: taskProof.orderNo}, raw: true});
+
+    const allCourierOrder = await CourierOrder.findAll({
+        where: {routeId: taskProof.routeId},
+        raw: true,
+        order: [
+            ["sortId", "ASC"]
+        ],
+    });
+
+    const courierOrder = allCourierOrder.filter((order) =>
+        order.orderNo === taskProof.orderNo
+    )[0];
+
     if (!courierOrder) {
         return res.json(statusModel.failed({message: "Courier order does not exists."}));
+    }
+
+    let nextOrderEstTime;
+    let nextOrderNo;
+    let nextCourierUpdate;
+
+    if (allCourierOrder.length > 1 && (courierOrder.sortId < allCourierOrder.length)) {
+        const nextOrder = allCourierOrder.filter((order) =>
+            order.sortId === (courierOrder.sortId + 1)
+        )[0];
+        const courierOrderList = [courierOrder, nextOrder];
+        const displayOrderList = getOrderListAddressOnRoute(courierOrderList, taskProof.routeId);
+        nextOrderNo = nextOrder.orderNo;
+        nextOrderEstTime = await MapDirectionRoutingController.getTwoPathDuration(displayOrderList);
+        nextCourierUpdate = {
+            estArriveTime: nextOrderEstTime.value,
+            orderNo: nextOrderNo
+        };
     }
 
     if (file) {
@@ -117,18 +179,26 @@ createTaskProofWithImage = async (req, res) => {
     } else {
         return res.json(statusModel.failed({message: "Order type is missing."}));
     }
-    await createTaskProofService(courierUpdate, courierOrder.orderNo, taskProof, res);
+    await createTaskProofService(courierUpdate, courierOrder.orderNo, taskProof, nextCourierUpdate, res);
     await checkFinishTask(taskProof.routeId, userId, res);
 
 }
 
-createTaskProofService = async (courierUpdate, orderNo, taskProof, res) => {
+createTaskProofService = async (courierUpdate, orderNo, taskProof, nextCourierUpdate, res) => {
     let transaction;
     try {
         transaction = await sequelize.transaction();
 
         await TaskProof.create(taskProof, {transaction: transaction});
         await CourierOrder.update(courierUpdate, {where: {orderNo: orderNo}, transaction: transaction});
+
+        if (nextCourierUpdate && nextCourierUpdate != null) {
+            await CourierOrder.update({estArriveTime: nextCourierUpdate.estArriveTime}, {
+                where: {orderNo: nextCourierUpdate.orderNo},
+                transaction: transaction
+            });
+        }
+
         await transaction.commit();
     } catch (err) {
         await transaction.rollback();
@@ -202,8 +272,14 @@ getRouteAndTasks = async (req, res) => {
         }
     );
 
-
     for (let route of orderRoute) {
+        let timeStart = new Date(route.departureDate);
+        let hourStart = route.departureTime.getHours();
+        let minStart = route.departureTime.getMinutes();
+
+        timeStart.setHours(hourStart);
+        timeStart.setMinutes(minStart);
+        timeStart.setSeconds(0);
         let orderList = courierOrder.filter(order => {
             return (route.routeId === order.routeId) || (route.routeId === order.pickupRouteId);
         });
@@ -212,6 +288,7 @@ getRouteAndTasks = async (req, res) => {
         route.companyAddress = companyAddresses.filter(address => {
             return address.id === route.departurePoint;
         })[0];
+        route.departureTime = timeStart;
         route.vehiclePlateNo = route['vehicleInfo.plateNo'];
         route.displayOrderList = getOrderListAddressOnRoute(sortedOrderList, route.routeId);
     }
@@ -219,16 +296,58 @@ getRouteAndTasks = async (req, res) => {
 };
 
 orderRouteStart = async (req, res) => {
-    const routeId = req.query.routeId;
+    const {routeId, companyAddress, roundTrip} = req.query;
+    let rt = false; //roundTrip
+    let departurePoint = Number(companyAddress); // company Addreess
+
+    if (!routeId) {
+        return res.json(statusModel.failed({message: "Failed to start."}));
+    }
+
+    if (Number(roundTrip) === 1) {
+        rt = true;
+    }
 
     let transaction;
     try {
         transaction = await sequelize.transaction();
 
+        const allOrders = await CourierOrder.findAll({
+            where: {
+                routeId: routeId
+            },
+            order: [["sortId", "ASC"]],
+            raw: true
+        });
+
+        let companyAddressModel;
+        let correctedOrderList = getOrderListAddressOnRoute(allOrders, routeId);
+        if (departurePoint) {
+            companyAddressModel = await CompanyAddress.findOne({where: {id: departurePoint}, raw: true});
+        } else {
+            return res.json(statusModel.failed({message: "Departure point is missing."}));
+        }
+
+        const totalDistanceModel = {
+            orderList: correctedOrderList,
+            companyAddress: companyAddressModel,
+            roundTrip: rt
+        };
+        const totalDistanceTime = await MapDirectionRoutingController.calcOrderTotalDistanceTime(totalDistanceModel);
+        let orderList = totalDistanceTime.orderList;
+        const firstTrafficDistanceTime = await MapDirectionRoutingController.getTwoPathDuration(orderList);
+        orderList[0].estArriveTime = firstTrafficDistanceTime.value;
+
         await OrderRoute.update(
-            {status: OrderStatusConstant.IN_PROGRESS, startedAt: new Date()},
+            {
+                status: OrderStatusConstant.IN_PROGRESS,
+                startedAt: new Date(),
+                timeNeeded: totalDistanceTime.totalDuration,
+                totalDistance: totalDistanceTime.totalDistance,
+            },
             {where: {routeId: routeId}, transaction: transaction},
         );
+
         // Pickup order
         await CourierOrder.update(
             {pickupOrderStatus: OrderStatusConstant.IN_PROGRESS},
@@ -270,13 +389,28 @@ orderRouteStart = async (req, res) => {
                 }, transaction: transaction
             }
         );
+
+        let promises = [];
+        for (let order of orderList) {
+            let newPromise = CourierOrder.update({
+                estArriveTime: order.estArriveTime
+            }, {
+                where: {
+                    [Op.and]: [
+                        {routeId: routeId},
+                        {orderNo: order.orderNo},
+                    ]
+                },
+                transaction: transaction
+            });
+            promises.push(newPromise);
+        }
+        await Promise.all(promises);
         await transaction.commit();
         return res.json(statusModel.success("Route started."));
     } catch (err) {
-        if (transaction) {
-            await transaction.rollback();
-            return res.json(statusModel.failed({message: "Failed to start."}));
-        }
+        await transaction.rollback();
+        return res.json(statusModel.failed({message: "Failed to start."}));
     }
 }
 

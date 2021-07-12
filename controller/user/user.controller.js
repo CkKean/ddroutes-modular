@@ -154,12 +154,21 @@ updateStaff = async (req, res) => {
     if (user) {
         statusModel.failed({message: "Failed! Username is already in use!"})
     }
+    let removeOriPhoto = false;
     if (req.file) {
         userData.profileImg = req.file.filename;
         userData.profileImgPath = '/' + req.file.destination.split('/')[1];
+        removeOriPhoto = true;
     } else {
-        userData.profileImg = null;
-        userData.profileImgPath = null;
+        if (userData.profileImg == null || !userData.profileImg) {
+            userData.profileImg = null;
+            userData.profileImgPath = null;
+            removeOriPhoto = true;
+        } else {
+            userData.profileImg = user.profileImg;
+            userData.profileImgPath = user.profileImgPath;
+            removeOriPhoto = false;
+        }
     }
 
     User.update(userData,
@@ -168,7 +177,7 @@ updateStaff = async (req, res) => {
                 userId: user.userId
             }
         }).then(() => {
-        if (req.file && user.profileImgPath && user.profileImg) {
+        if (removeOriPhoto && user.profileImgPath && user.profileImg) {
             const filePath = IMAGE_PATH + user.profileImgPath + '/' + user.profileImg;
             try {
                 fs.unlinkSync(filePath);

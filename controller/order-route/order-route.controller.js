@@ -10,6 +10,7 @@ const CompanyAddress = require("../../config/database").companyAddress;
 const User = require("../../config/database").user;
 const CourierOrder = require("../../config/database").courierOrder;
 const RouteReport = require("../../config/database").routeReport;
+const TaskProof = require("../../config/database").taskProof;
 const sequelize = require("../../config/database").sequelize;
 const MapDirectionRoutingController = require("../map-direction-routing/map-direction-routing.controller");
 const {
@@ -50,6 +51,7 @@ findAll = async (req, res) => {
         raw: true
     });
     const companyAddresses = await CompanyAddress.findAll({raw: true});
+    const taskProofs = await TaskProof.findAll({raw: true});
 
     for (let route of orderRoute) {
         let completed = 0;
@@ -57,7 +59,6 @@ findAll = async (req, res) => {
         const companyAddress = companyAddresses.filter(address => address.id === route.departurePoint)[0];
         // Sort Order
         let sortedOrderList = sortOrder(orderList, route.routeId);
-
         // Calculate Completed Order
         for (let order of orderList) {
             if (getOrderTypeRouteId(order, route.routeId) === 0) {
@@ -69,11 +70,34 @@ findAll = async (req, res) => {
                     completed++;
                 }
             }
+
+            let proof;
+            if (order.orderType === OrderTypeConstant.PICK_UP) {
+                if (order.isPickedUp && order.pickupRouteId === route.routeId) { // Success Pickup
+                    if (order.pickupProofId) {
+                        proof = taskProofs.filter((proof) => order.pickupProofId === proof.proofId)[0];
+                    }
+                } else if (!order.isPickedUp && order.routeId === route.routeId) { // Failed Pickup
+                    if (order.pickupProofId) {
+                        proof = taskProofs.filter((proof) => order.pickupProofId === proof.proofId)[0];
+                    }
+                } else if (order.isPickedUp && order.routeId === route.routeId) { // Pickup -> Success
+                    if (order.proofId) {
+                        proof = taskProofs.filter((proof) => order.proofId === proof.proofId)[0];
+                    }
+                }
+            } else {
+                if (order.proofId) {
+                    proof = taskProofs.filter((proof) => order.proofId === proof.proofId)[0];
+                }
+            }
+            order.proof = proof;
         }
+
         const displayOrderList = getOrderListAddressOnRoute(sortedOrderList, route.routeId);
         const orderListCount = displayOrderList.length;
         let totalServiceTime = orderListCount * (60 * 3); // 3 min service time
-        let totalEstTimeUsed = +route.timeNeeded + totalServiceTime;
+        let totalEstTimeUsed = +route.timeNeeded + +totalServiceTime;
 
         route.timeNeeded = convertSecondToDHM(totalEstTimeUsed);
 
@@ -143,6 +167,8 @@ updateOrderRoute = async (req, res) => {
 
         const courierOrder = req.body.orderList;
         const totalItemsQty = courierOrder.map(order => order.itemQty).reduce((sum, order) => (sum + order), 0);
+        let transaction;
+        transaction = await sequelize.transaction();
 
         let companyAddress;
         if (req.body.departurePoint) {
@@ -161,7 +187,7 @@ updateOrderRoute = async (req, res) => {
 
         const totalDistanceTime = await MapDirectionRoutingController.calcOrderTotalDistanceTime(totalDistanceModel);
 
-        let transaction;
+
         try {
             transaction = await sequelize.transaction();
 
@@ -190,8 +216,33 @@ updateOrderRoute = async (req, res) => {
                 createdAt: new Date(),
                 routeId: req.body.routeId
             };
+
+            let promises = [];
+            for (let i in courierOrder) {
+                let newPromise = await CourierOrder.update({
+                    sortId: +i + 1,
+                    routeId: routeId
+                }, {
+                    where: {routeId: routeId},
+                    transaction: transaction
+                });
+                promises.push(newPromise);
+            }
+
             await updateRouteReport(data, transaction, res);
-            await removeCourierOrderRouteId(orderDeleteNoList, transaction, res);
+            await CourierOrder.update({
+                    routeId: null,
+                    sortId: null,
+                }, {
+                    where: {
+                        orderNo: {
+                            [Op.in]: orderDeleteNoList
+                        }
+                    },
+                    transaction: transaction
+                }
+            );
+            await Promise.all(promises);
             await transaction.commit();
 
             return res.json(statusModel.success("Order route has been updated."));
@@ -211,60 +262,76 @@ addOrdersToRoute = async (req, res) => {
     const routeId = req.body.routeId;
 
     if (orderRoute) {
-        const courierOrder = req.body.orderList;
-        const orderNoList = courierOrder.map(order => order.orderNo);
+        const orderList = req.body.orderList;
+        if (orderList.length <= 0) {
+            return res.json(statusModel.failed({message: "Orders is required."}));
+        }
+
         let transaction;
         try {
             transaction = await sequelize.transaction();
-
-            await CourierOrder.update({
+            const courierOrder = await CourierOrder.findAll({
+                where: {routeId: routeId},
+                raw: true,
+                order: [
+                    ["sortId", "ASC"]
+                ],
+            });
+            let latestSortId = courierOrder[courierOrder.length - 1].sortId;
+            let promises = [];
+            for (let i in orderList) {
+                let newPromise = await CourierOrder.update({
+                    sortId: +latestSortId + (+i + 1),
                     routeId: routeId
                 }, {
-                    where: {
-                        orderNo: {
-                            [Op.in]: orderNoList
-                        }
-                    },
-                }
-            );
-            const courierOrderList = await CourierOrder.findAll({where: {routeId: routeId}, raw: true});
-
-            if (courierOrderList) {
-                let sortedOrderList = sortOrder(courierOrderList, routeId);
-
-                let companyAddress;
-                if (orderRoute.departurePoint) {
-                    companyAddress = await CompanyAddress.findOne({where: {id: orderRoute.departurePoint}, raw: true});
-                } else {
-                    return res.json(statusModel.failed({message: "Departure point is missing."}));
-                }
-
-                const totalDistanceModel = {
-                    orderList: getOrderListAddressOnRoute(sortedOrderList, routeId),
-                    companyAddress: companyAddress,
-                    roundTrip: orderRoute.roundTrip
-                };
-
-                let totalDistanceTime = await MapDirectionRoutingController.calcOrderTotalDistanceTime(totalDistanceModel);
-                const totalItemsQty = courierOrderList.map(order => order.itemQty).reduce((sum, order) => (sum + order), 0);
-
-                const data = {
-                    totalDistanceTime: totalDistanceTime,
-                    totalItemsQty: totalItemsQty,
-                    updatedBy: req.userId,
-                    updatedAT: new Date(),
-                    routeId: routeId
-                };
-                await updateRouteReport(data, transaction, res);
-                await updateOrderRouteDistance(data, transaction, res);
-                await transaction.commit();
-
-                return res.json(statusModel.success("Order route have been updated."));
+                    where: {orderNo: orderList[i].orderNo},
+                });
+                promises.push(newPromise);
             }
+
+            await Promise.all(promises).then(async (_) => {
+
+                const courierOrderList = await CourierOrder.findAll({where: {routeId: routeId}, raw: true});
+
+                if (courierOrderList) {
+                    let sortedOrderList = sortOrder(courierOrderList, routeId);
+
+                    let companyAddress;
+                    if (orderRoute.departurePoint) {
+                        companyAddress = await CompanyAddress.findOne({
+                            where: {id: orderRoute.departurePoint},
+                            raw: true
+                        });
+                    } else {
+                        return res.json(statusModel.failed({message: "Departure point is missing."}));
+                    }
+
+                    const totalDistanceModel = {
+                        orderList: getOrderListAddressOnRoute(sortedOrderList, routeId),
+                        companyAddress: companyAddress,
+                        roundTrip: orderRoute.roundTrip
+                    };
+
+                    let totalDistanceTime = await MapDirectionRoutingController.calcOrderTotalDistanceTime(totalDistanceModel);
+                    const totalItemsQty = courierOrderList.map(order => order.itemQty).reduce((sum, order) => (sum + order), 0);
+
+                    const data = {
+                        totalDistanceTime: totalDistanceTime,
+                        totalItemsQty: totalItemsQty,
+                        updatedBy: req.userId,
+                        updatedAT: new Date(),
+                        routeId: routeId
+                    };
+                    await updateRouteReport(data, transaction, res);
+                    await updateOrderRouteDistance(data, transaction, res);
+                    await transaction.commit();
+
+                    return res.json(statusModel.success("Order route have been updated."));
+                }
+            });
         } catch (err) {
             await transaction.rollback();
             return res.json(statusModel.failed({message: "Order route failed to update."}));
-
         }
     } else {
         return res.json(statusModel.failed({message: "Order route does not exist."}));
@@ -281,7 +348,9 @@ deleteOrderRoute = async (req, res) => {
             transaction = await sequelize.transaction();
 
             //Delivery Order
-            await CourierOrder.update({routeId: null, sortId: null, orderStatus: OrderStatusConstant.PENDING}, {
+            await CourierOrder.update({
+                    routeId: null, sortId: null, orderStatus: OrderStatusConstant.PENDING, estArriveTime: null
+                }, {
                     where: {
                         [Op.and]: [
                             {routeId: routeId},
@@ -295,7 +364,9 @@ deleteOrderRoute = async (req, res) => {
             await CourierOrder.update({
                     routeId: null,
                     sortId: null,
-                    pickupOrderStatus: OrderStatusConstant.PENDING
+                    pickupOrderStatus: OrderStatusConstant.PENDING,
+                    estArriveTime: null
+
                 }, {
                     where: {
                         [Op.and]: [
@@ -312,7 +383,8 @@ deleteOrderRoute = async (req, res) => {
                     routeId: null,
                     sortId: null,
                     orderStatus: OrderStatusConstant.PICKED_UP,
-                    isPickedUp: true
+                    isPickedUp: true,
+                    estArriveTime: null
                 }, {
                     where: {
                         [Op.and]: [
@@ -614,16 +686,16 @@ findUnHandleOrders = async (req, res) => {
 }
 
 manualOptimizeRoute = async (req, res) => {
-    const {sortList, optimizeType, departurePoint, routeId} = req.body;
+    const {sortList, departurePoint, routeId} = req.body;
 
     const orderRoute = await verifyOrderRoute(routeId);
     const roundTrip = orderRoute.roundTrip;
 
     if (!orderRoute) {
-        return res.json(statusModel.failed({message: "Optimization type does not exist."}));
+        return res.json(statusModel.failed({message: "Order Route does not exist."}));
     }
 
-    if (optimizeType === 'Manual' && sortList.length > 0) {
+    if (sortList.length > 0) {
 
         let companyAddress;
         if (departurePoint) {
@@ -639,7 +711,7 @@ manualOptimizeRoute = async (req, res) => {
             let promises = [];
             for (let order of sortList) {
                 let newPromise = CourierOrder.update({
-                    sortId: order.sortId
+                    sortId: order.sortId,
                 }, {
                     where: {
                         [Op.and]: [
@@ -653,18 +725,11 @@ manualOptimizeRoute = async (req, res) => {
 
             await Promise.all(promises).then(async (_) => {
 
-                const courierOrder = await CourierOrder.findAll({
-                    where: {routeId: routeId},
-                    order: [["sortId", "ASC"]],
-                    raw: true
-                });
-
                 const totalDistanceModel = {
-                    orderList: getOrderListAddressOnRoute(courierOrder, routeId),
+                    orderList: sortList,
                     companyAddress: companyAddress,
                     roundTrip: roundTrip
                 };
-
                 const totalDistanceTime = await MapDirectionRoutingController.calcOrderTotalDistanceTime(totalDistanceModel);
                 const updatedData = {
                     totalDistanceTime: totalDistanceTime,
@@ -672,6 +737,7 @@ manualOptimizeRoute = async (req, res) => {
                     updatedAt: new Date(),
                     routeId: routeId
                 }
+
                 await updateOrderRouteDistance(updatedData, transaction, res);
                 await updateRouteReportDistance(updatedData, transaction, res);
                 await transaction.commit();
@@ -682,12 +748,12 @@ manualOptimizeRoute = async (req, res) => {
             return res.json(statusModel.failed({message: "Waypoints failed to optimize."}));
         }
     } else {
-        return res.json(statusModel.failed({message: "Optimization type does not exist."}));
+        return res.json(statusModel.failed({message: "Waypoints does not exist."}));
     }
 }
 
 autoOptimizeRoute = async (req, res) => {
-    const {sortList, optimizeType, departurePoint, routeId} = req.body;
+    const {sortList, departurePoint, routeId} = req.body;
     const orderRoute = await verifyOrderRoute(routeId);
     const roundTrip = orderRoute.roundTrip;
 
@@ -695,9 +761,9 @@ autoOptimizeRoute = async (req, res) => {
         return res.json(statusModel.failed({message: "Order route does not exist."}));
     }
 
-    if (optimizeType === 'Automatic' && sortList.length > 0) {
+    if (sortList.length > 0) {
         const orderNoList = sortList.map(sort => sort.orderNo);
-        const courierOrders = await CourierOrder.findAll(
+        let courierOrders = await CourierOrder.findAll(
             {
                 where:
                     {
@@ -726,19 +792,10 @@ autoOptimizeRoute = async (req, res) => {
         if (!result.optimizeStatus) {
             return res.json(statusModel.failed({message: "Waypoints failed to optimize. Please try again later."}));
         }
-
-        for (let orderIndex in courierOrders) {
-            for (let waypointIndex in result.wayPoints) {
-                let index = parseInt(waypointIndex) + 1;
-                if (orderIndex === waypointIndex) {
-                    courierOrders[parseInt(orderIndex)].sortId = parseInt(result.wayPoints[index].waypoint_index);
-                }
-            }
-        }
-
-
+        courierOrders = setSortIds(courierOrders, result.wayPoints);
         //     // ------------------------------------------ Calculate Route Distance ----------------------------------------------------------
         let sortedOrderList = sortOrder(courierOrders, routeId);
+
         let correctedAddressOrderList = getOrderListAddressOnRoute(sortedOrderList, routeId);
         const totalDistanceModel = {
             orderList: correctedAddressOrderList,
@@ -792,10 +849,21 @@ autoOptimizeRoute = async (req, res) => {
             return res.json(statusModel.failed({message: "Waypoints failed to optimize."}));
         }
     } else {
-        return res.json(statusModel.failed({message: "Optimization type does not exist."}));
+        return res.json(statusModel.failed({message: "Waypoints does not exist."}));
     }
 }
 
+setSortIds = (courierOrders, wayPoints) => {
+    for (let orderIndex in courierOrders) {
+        for (let waypointIndex in wayPoints) {
+            let index = parseInt(waypointIndex) + 1;
+            if (orderIndex === waypointIndex) {
+                courierOrders[parseInt(orderIndex)].sortId = parseInt(wayPoints[index].waypoint_index);
+            }
+        }
+    }
+    return courierOrders;
+}
 
 updateOrderRouteDistance = async (data, transaction) => {
 
@@ -840,20 +908,10 @@ updateRouteReport = async (data, transaction) => {
 };
 
 
-removeCourierOrderRouteId = async (orderNoList, transaction) => {
-    await CourierOrder.update({
-            routeId: null,
-            sortId: null,
-        }, {
-            where: {
-                orderNo: {
-                    [Op.in]: orderNoList
-                }
-            },
-            transaction: transaction
-        }
-    );
+updateCourierOrder = async (orderNoList, transaction, routeId, res) => {
+
 }
+
 
 updateCourierOrderRouteId = async (data, transaction) => {
     await CourierOrder.update({

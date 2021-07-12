@@ -56,7 +56,6 @@ getOrderTypeRouteId = (order, routeId) => {
     }
 }
 
-
 // For order list only
 getOrderListAddress = (courierOrderList) => {
     let orderList = [];
@@ -69,6 +68,7 @@ getOrderListAddress = (courierOrderList) => {
                 ...orderBasicInfo,
                 ...getOrderSenderInfo(order),
                 displayOrderType: displayOrderType,
+                displayOrderStatus: order.pickupOrderStatus
             });
         } else {
             if (order.orderType === OrderTypeConstant.PICK_UP && order.isPickedUp) {
@@ -78,8 +78,7 @@ getOrderListAddress = (courierOrderList) => {
                 ...orderBasicInfo,
                 ...getOrderRecipientInfo(order),
                 displayOrderType: displayOrderType,
-
-
+                displayOrderStatus: order.orderStatus,
             });
         }
     }
@@ -160,6 +159,7 @@ getOrderBasicInfo = (order) => {
         trackingNo: order.trackingNo,
         itemQty: order.itemQty,
         itemWeight: order.itemWeight,
+        proof: order.proof ? order.proof : null,
     };
 }
 
@@ -193,8 +193,8 @@ convertSecondToDHM = (seconds) => {
     let m = Math.floor(+seconds % 3600 / 60);
 
     let dDisplay = d > 0 ? d + (d == 1 ? " day" : " days") : "";
-    let hDisplay = h > 0 ? h + (h == 1 ? ", hour, " : ", hours ") : "";
-    let mDisplay = m > 0 ? m + (m == 1 ? " , minute " : ", minutes ") : "";
+    let hDisplay = h > 0 ? h + (h == 1 ? " hour " : " hours ") : "";
+    let mDisplay = m > 0 ? m + (m == 1 ? " minute " : " minutes ") : "";
 
     let hms = dDisplay + hDisplay + mDisplay;
     return hms;

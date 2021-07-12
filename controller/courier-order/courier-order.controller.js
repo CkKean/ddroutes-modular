@@ -66,6 +66,9 @@ findByOrderNo = async (req, res) => {
     let allProof;
     let taskProof = null;
     let pickupTaskProof = null;
+
+    let userIdList = [courierOrder.createdBy];
+
     if (courierOrder.pickupProofId != null && courierOrder.proofId != null) { // For picked up
         allProof = await TaskProof.findAll(
             {
@@ -73,7 +76,7 @@ findByOrderNo = async (req, res) => {
                     {
                         [Op.or]: [
                             {proofId: courierOrder.proofId},
-                            {pickupRouteId: courierOrder.pickupProofId},
+                            {proofId: courierOrder.pickupProofId},
                         ]
                     },
                 raw: true
@@ -82,12 +85,14 @@ findByOrderNo = async (req, res) => {
 
         for (let proof of allProof) {
             if (proof.proofId === courierOrder.proofId) {
-                taskProof = courierOrder.proofId;
+                taskProof = proof;
             }
             if (proof.proofId === courierOrder.pickupProofId) {
-                pickupTaskProof = courierOrder.pickupProofId;
+                pickupTaskProof = proof;
             }
         }
+        userIdList.push(taskProof.createdBy);
+        userIdList.push(pickupTaskProof.createdBy);
 
     } else if (courierOrder.proofId != null && courierOrder.pickupProofId == null) { // For delivery
         taskProof = await TaskProof.findOne(
@@ -97,6 +102,7 @@ findByOrderNo = async (req, res) => {
                 raw: true
             }
         );
+        userIdList.push(taskProof.createdBy);
     } else if (courierOrder.proofId == null && courierOrder.pickupProofId != null) {// For Pick up only
         pickupTaskProof = await TaskProof.findOne(
             {
@@ -105,12 +111,25 @@ findByOrderNo = async (req, res) => {
                 raw: true
             }
         );
+        userIdList.push(pickupTaskProof.createdBy);
     }
-
-    const userList = await findUserByUserId(courierOrder.createdBy);
-    courierOrder.createdBy = userList.fullName;
-    courierOrder.proofInfo = taskProof;
-    courierOrder.pickupProofInfo = pickupTaskProof;
+    const allUsers = await User.findAll({
+        where: {
+            userId: {
+                [Op.in]: userIdList
+            }
+        },
+        raw: true
+    });
+    courierOrder.createdBy = allUsers.filter((user) => user.userId === courierOrder.createdBy)[0].fullName;
+    if (pickupTaskProof != null) {
+        courierOrder.pickupProofInfo = pickupTaskProof;
+        courierOrder.pickupProofInfo.pickupPersonnel = allUsers.filter((user) => user.userId === pickupTaskProof.createdBy)[0].fullName;
+    }
+    if (taskProof != null) {
+        courierOrder.proofInfo = taskProof;
+        courierOrder.proofInfo.deliveryPersonnel = allUsers.filter((user) => user.userId === taskProof.createdBy)[0].fullName;
+    }
 
     return res.json(statusModel.success(courierOrder));
 }
@@ -185,6 +204,17 @@ deleteCourierOrder = async (req, res) => {
 
 updateCourierOrder = async (req, res) => {
     const courierOrder = await verifyCourierOrderByOrderId(req.body.orderId);
+
+    let recipientGeocodingData = await MapDirectionRoutingController.getGeoCoding(req.body.fullRecipientAddress);
+    let senderGeocodingData = await MapDirectionRoutingController.getGeoCoding(req.body.fullSenderAddress);
+
+    req.body.senderLongitude = senderGeocodingData.longitude;
+    req.body.senderLatitude = senderGeocodingData.latitude;
+    req.body.senderFormattedAddress = senderGeocodingData.formattedAddress;
+
+    req.body.recipientLongitude = recipientGeocodingData.longitude;
+    req.body.recipientLatitude = recipientGeocodingData.latitude;
+    req.body.recipientFormattedAddress = recipientGeocodingData.formattedAddress;
 
     if (courierOrder) {
         req.body.updatedBy = req.userId;
@@ -262,14 +292,14 @@ calculateShippingCost = async (req, res) => {
 
     if (distance.distanceValue > defaultDistance) {
         const distanceDifference = (distance.distanceValue - defaultDistance) / 1000;
-        shippingCost = +shippingCost + +(distanceDifference.toFixed(0) * pricePlan.subDistancePricing);
+        shippingCost = +shippingCost + +(distanceDifference * pricePlan.subDistancePricing);
     }
 
     if (defaultWeight < itemWeight) {
         shippingCost = +shippingCost + +((itemWeight - defaultWeight) * +pricePlan.subWeightPricing);
     }
 
-    return res.json(statusModel.success(Number(shippingCost)));
+    return res.json(statusModel.success(Number(Math.round(shippingCost))));
 }
 
 

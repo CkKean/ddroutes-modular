@@ -103,13 +103,22 @@ updateVehicle = async (req, res) => {
     let vehicleData = JSON.parse(req.body.vehicle);
     const vehicle = await verifyVehicle(vehicleData.vehicleId);
 
+    let removeOriPhoto = false;
     if (vehicle) {
         if (req.file) {
             vehicleData.photo = req.file.filename;
             vehicleData.photoPath = '/' + req.file.destination.split('/')[1];
+            removeOriPhoto = true;
         } else {
-            vehicleData.photo = null;
-            vehicleData.photoPath = null;
+            if (vehicleData.photo == null || !vehicle.photo) {
+                vehicleData.photo = null;
+                vehicleData.photoPath = null;
+                removeOriPhoto = true;
+            } else {
+                vehicleData.photo = vehicle.photo;
+                vehicleData.photoPath = vehicle.photoPath;
+                removeOriPhoto = false;
+            }
         }
         vehicleData.updatedAt = new Date();
         vehicleData.updatedBy = req.userId;
@@ -120,7 +129,7 @@ updateVehicle = async (req, res) => {
                     vehicleId: vehicleData.vehicleId
                 }
             }).then(() => {
-            if (req.file && vehicle.photoPath && vehicle.photo) {
+            if (removeOriPhoto && vehicle.photoPath && vehicle.photo) {
                 const filePath = 'uploaded-files' + vehicle.photoPath + '/' + vehicle.photo;
                 try {
                     fs.unlinkSync(filePath);
