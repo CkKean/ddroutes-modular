@@ -101,6 +101,14 @@ findAll = async (req, res) => {
 
         route.timeNeeded = convertSecondToDHM(totalEstTimeUsed);
 
+        let timeStart = new Date(route.departureDate);
+        let hourStart = route.departureTime.getHours();
+        let minStart = route.departureTime.getMinutes();
+
+        timeStart.setHours(hourStart);
+        timeStart.setMinutes(minStart);
+        timeStart.setSeconds(0);
+        route.departureTime = timeStart;
         route.dataValues.completed = completed;
         route.dataValues.orderList = sortedOrderList;
         route.dataValues.departureAddress = companyAddress;
