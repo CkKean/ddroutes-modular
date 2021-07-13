@@ -37,11 +37,8 @@ if (process.env.NODE_ENV === "development") {
         {
             host: "us-cdbr-east-04.cleardb.com",
             dialect: "mysql",
-            dialectOptions: {
-                options: {
-                    useUTC: false, // for reading from database
-                },
-            },
+            operatorAliases: false,
+            timezone: '+08:00',
             pool: {
                 connectionLimit: 10
             },
