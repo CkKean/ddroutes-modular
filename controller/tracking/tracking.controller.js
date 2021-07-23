@@ -81,9 +81,12 @@ findAllByTrackingOrderNo = async (req, res) => {
                     raw: true
                 });
                 orderComingAt = pickupOrderRoute.startedAt;
+                console.log(orderComingAt.toLocaleString());
                 if (pickupOrderRoute.status === OrderStatusConstant.IN_PROGRESS) {
                     step = 2;
                     orderEstComingAt = getTotalEstTime(orderComingAt, sortedCourierOrder, courierOrder);
+                    console.log(orderEstComingAt.toLocaleString());
+
                 }
                 if (pickUpTaskProof) {
                     if (pickUpTaskProof.status === OrderStatusConstant.NOT_PICK_UP) {
@@ -231,12 +234,12 @@ getTotalEstTime = (startTime, sortedCourierOrder, courierOrder) => {
 
     let totalEstArriveTime = 0;
 
-    let startTimeSecond = convertDateTimeToSecond(new Date(startTime).setHours(9, 0, 0));
+    let startTimeSecond = convertDateTimeToSecond(new Date(startTime));
     let courierOrderEstTimeSecond = courierOrder.estArriveTime;
 
-    let arrivalDateTime;
+    let arrivalDateTime
 
-    if (startTime >= afterBreakTime) { // After 12-1pm then start the route
+    if (startTime >= breakTime) { // After 12-1pm then start the route
         for (let i in sortedCourierOrder) {
             if (sortedCourierOrder[i].orderNo !== courierOrder.orderNo) {
                 totalEstArriveTime = totalEstArriveTime + sortedCourierOrder[i].estArriveTime;
@@ -244,6 +247,7 @@ getTotalEstTime = (startTime, sortedCourierOrder, courierOrder) => {
                 break;
             }
         }
+
         arrivalDateTime = new Date((startTimeSecond + totalEstArriveTime + courierOrderEstTimeSecond) * 1000);
     } else { // Before 12 pm start
 
