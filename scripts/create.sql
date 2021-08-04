@@ -1,254 +1,233 @@
 CREATE DATABASE ddroutes;
 
-CREATE TABLE USER
+create table user
 (
-    user_id           varchar(255) DEFAULT (uuid()) PRIMARY KEY,
-    user_type         int          NOT NULl,
-    username          varchar(255) NOT NULl UNIQUE,
-    email             varchar(255) NOT NULl UNIQUE,
-    password          varchar(255) NOT NULl,
-
-    address           varchar(255) NOT NULl,
-    city              varchar(255) NOT NULl,
-    state             varchar(255) NOT NULl,
-    postcode          varchar(100) NOT NULl,
-    country           varchar(100) NOT NULl,
-    dob               Date         NOT NULl,
-    gender            varchar(50)  NOT NULl,
-    fullname          varchar(255) NOT NULl,
-    mobile_no         varchar(100) NOT NULl,
-    race              varchar(255) NOT NULl,
-    religion          varchar(100) NOT NULl,
-
-    start_date        Date,
-    position          varchar(100),
-    profile_img       varchar(255),
-    profile_img_path  varchar(255),
-
-    created_date_time datetime     NOT NULl,
-    created_by        varchar(255)
+    user_id           varchar(255) not null
+        primary key,
+    user_type         int          not null,
+    username          varchar(255) not null,
+    email             varchar(255) not null,
+    password          varchar(255) not null,
+    address           varchar(255) not null,
+    city              varchar(255) not null,
+    state             varchar(255) not null,
+    postcode          varchar(100) not null,
+    country           varchar(255) not null,
+    dob               datetime     not null,
+    gender            varchar(255) not null,
+    fullname          varchar(255) not null,
+    mobile_no         varchar(255) not null,
+    race              varchar(255) not null,
+    religion          varchar(255) not null,
+    start_date        date         null,
+    position          varchar(255) null,
+    profile_img       varchar(255) null,
+    profile_img_path  varchar(255) null,
+    created_date_time datetime     not null,
+    created_by        varchar(255) null,
+    constraint email
+        unique (email),
+    constraint username
+        unique (username)
 );
 
-CREATE TABLE STATE_LIST
+create table vehicle
 (
-    id   int NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    NAME varchar(255),
-    ABBR varchar(100)
+    id                   int auto_increment
+        primary key,
+    vehicle_id           varchar(255) not null,
+    plate_no             varchar(50)  not null,
+    brand                varchar(100) not null,
+    model                varchar(100) not null,
+    color                varchar(100) not null,
+    fuel_efficiency      decimal(20)  not null,
+    fuel_efficiency_unit varchar(100) not null,
+    fuel_tank            decimal(20)  not null,
+    type                 varchar(50)  not null,
+    owner                varchar(50)  not null,
+    gps_track_no         varchar(100) null,
+    photo                varchar(255) null,
+    photo_path           varchar(255) null,
+    created_by           varchar(255) null,
+    updated_by           varchar(255) null,
+    created_at           datetime     not null,
+    updated_at           datetime     null,
+    constraint plate_no
+        unique (plate_no),
+    constraint vehicle_id
+        unique (vehicle_id),
+    constraint vehicle_user_user_id_fk
+        foreign key (owner) references user (user_id)
+            on delete cascade
 );
 
-CREATE TABLE RACE_LIST
+create table price_plan
 (
-    id   int NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    NAME varchar(255)
+    price_plan_id           varchar(255)   not null
+        primary key,
+    vehicle_type            varchar(100)   not null,
+    default_weight_prefix   varchar(50)    not null,
+    default_weight          decimal(20, 2) not null,
+    default_weight_unit     varchar(50)    not null,
+    default_distance_prefix varchar(50)    not null,
+    default_distance        decimal(20, 2) not null,
+    default_distance_unit   varchar(50)    not null,
+    default_pricing         decimal(20, 2) not null,
+    sub_distance            decimal(20, 2) null,
+    sub_distance_pricing    decimal(20, 2) null,
+    sub_distance_unit       varchar(50)    null,
+    sub_weight              decimal(20, 2) null,
+    sub_weight_pricing      decimal(20, 2) null,
+    sub_weight_unit         varchar(50)    null,
+    created_by              varchar(255)   null,
+    created_at              datetime       not null,
+    updated_by              varchar(255)   null,
+    updated_at              datetime       null,
+    constraint price_plan_vehicle_type_uindex
+        unique (vehicle_type),
+    constraint price_plan_user_user_id_fk
+        foreign key (created_by) references user (user_id),
+    constraint price_plan_user_user_id_fk_2
+        foreign key (updated_by) references user (user_id)
 );
 
-CREATE TABLE RELIGION_LIST
+create table courier_order
 (
-    id   int NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    NAME varchar(255)
+    order_id                    varchar(255)   not null
+        primary key,
+    order_no                    varchar(255)   not null,
+    order_type                  varchar(255)   not null,
+    order_status                varchar(100)   null,
+    tracking_no                 varchar(255)   not null,
+    sender_name                 varchar(255)   not null,
+    sender_mobile_no            varchar(100)   not null,
+    sender_email                varchar(255)   null,
+    sender_address              varchar(255)   not null,
+    sender_city                 varchar(255)   not null,
+    sender_state                varchar(255)   not null,
+    sender_postcode             varchar(255)   not null,
+    sender_latitude             varchar(255)   not null,
+    sender_longitude            varchar(255)   not null,
+    sender_formatted_address    varchar(255)   not null,
+    recipient_name              varchar(255)   not null,
+    recipient_mobile_no         varchar(100)   not null,
+    recipient_email             varchar(255)   null,
+    recipient_address           varchar(255)   not null,
+    recipient_city              varchar(255)   not null,
+    recipient_state             varchar(255)   not null,
+    recipient_postcode          varchar(255)   not null,
+    recipient_latitude          varchar(255)   not null,
+    recipient_longitude         varchar(255)   not null,
+    recipient_formatted_address varchar(255)   not null,
+    item_qty                    int            not null,
+    item_type                   varchar(100)   not null,
+    item_weight                 decimal(20, 3) not null,
+    vehicle_type                varchar(100)   not null,
+    shipping_cost               decimal(20, 2) not null,
+    payment_method              varchar(100)   null,
+    proof_id                    varchar(255)   null,
+    route_id                    varchar(255)   null,
+    sort_id                     int            null,
+    is_picked_up                tinyint(1)     null,
+    pickup_order_status         varchar(100)   null,
+    pickup_proof_id             varchar(255)   null,
+    pickup_sort_id              int            null,
+    pickup_route_id             varchar(255)   null,
+    created_by                  varchar(255)   null,
+    created_at                  datetime       not null,
+    updated_by                  varchar(255)   null,
+    updated_at                  datetime       null,
+    est_arrive_time             int            null,
+    constraint order_no
+        unique (order_no),
+    constraint tracking_no
+        unique (tracking_no),
+    constraint courier_order_order_routes_route_id_fk
+        foreign key (route_id) references order_routes (route_id)
+            on delete cascade,
+    constraint courier_order_task_proof_proof_id_fk
+        foreign key (proof_id) references task_proof (proof_id)
 );
 
-CREATE TABLE VEHICLE
+create table route_report
 (
-    id                   int          NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    vehicle_id           varchar(255) NOT NULL UNIQUE,
-    plate_no             varchar(50)  NOT NULL UNIQUE,
-    brand                varchar(100) NOT NULL,
-    model                varchar(100) NOT NULL,
-    color                varchar(100) NOT NULL,
-    fuel_efficiency      decimal(20)  NOT NULL,
-    fuel_efficiency_unit varchar(100) NOT NULL,
-    fuel_tank            decimal(20)  NOT NULL,
-    type                 varchar(50)  NOT NULL,
-    owner                varchar(50)  NOT NULL,
-    gps_track_no         varchar(100),
-    photo                varchar(255),
-    photo_path           varchar(255),
-    created_by           varchar(255) REFERENCES User (user_id),
-    updated_by           varchar(255) REFERENCES User (user_id),
-    created_at           DATETIME     NOT NULL,
-    updated_at           DATETIME
+    route_report_id            varchar(255)   not null
+        primary key,
+    actual_petrol_fees         decimal(20, 2) null,
+    calculated_distance_travel decimal(20, 3) null,
+    calculated_petrol_fees     decimal(20, 2) null,
+    calculated_petrol_usage    decimal(20, 3) null,
+    latest_petrol_price        decimal(20, 2) null,
+    statement                  varchar(255)   null,
+    statement_path             varchar(255)   null,
+    total_items_qty            int            not null,
+    route_id                   varchar(255)   null,
+    created_by                 varchar(255)   null,
+    created_at                 datetime       not null,
+    updated_by                 varchar(255)   null,
+    updated_at                 datetime       null,
+    constraint route_report_order_routes_route_id_fk
+        foreign key (route_id) references order_routes (route_id)
+            on delete cascade
 );
 
-CREATE TABLE CAR_BRAND_LIST
+create table order_routes
 (
-    id   int NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    NAME varchar(255)
+    route_id        varchar(255)   not null
+        primary key,
+    departure_point int            not null,
+    round_trip      tinyint(1)     null,
+    departure_date  datetime       not null,
+    departure_time  datetime       not null,
+    personnel       varchar(255)   not null,
+    status          varchar(255)   not null,
+    time_needed     decimal(20, 2) null,
+    total_distance  decimal(20, 3) null,
+    vehicle_id      varchar(255)   null,
+    created_by      varchar(255)   null,
+    created_at      datetime       not null,
+    updated_by      varchar(255)   null,
+    updated_at      datetime       null,
+    started_at      datetime       null,
+    constraint order_routes_company_addresses_id_fk
+        foreign key (departure_point) references company_addresses (id),
+    constraint order_routes_user_user_id_fk
+        foreign key (personnel) references user (user_id),
+    constraint order_routes_vehicle_vehicle_id_fk
+        foreign key (vehicle_id) references vehicle (vehicle_id)
 );
 
-CREATE TABLE MOTORCYCLE_BRAND_LIST
+create table company_addresses
 (
-    id   int NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    NAME varchar(255)
+    id                int auto_increment
+        primary key,
+    address           varchar(255) not null,
+    city              varchar(255) not null,
+    state             varchar(255) not null,
+    postcode          varchar(255) not null,
+    latitude          varchar(255) not null,
+    longitude         varchar(255) not null,
+    formatted_address varchar(255) not null
 );
 
-CREATE TABLE PRICE_PLAN
+create table task_proof
 (
-    price_plan_id           varchar(255)        NOT NULL PRIMARY KEY,
-
-    default_weight_prefix   varchar(50)         NOT NULL,
-    default_weight          decimal(20, 2)      NOT NULL,
-    default_weight_unit     varchar(50)         NOT NULL,
-
-    default_distance_prefix varchar(50)         NOT NULL,
-    default_distance        decimal(20, 2)      NOT NULL,
-    default_distance_unit   varchar(50)         NOT NULL,
-
-    default_pricing         decimal(20, 2)      NOT NULL,
-
-    vehicle_type            varchar(100) UNIQUE NOT NULL,
-
-    sub_distance            decimal(20, 2),
-    sub_distance_pricing    decimal(20, 2),
-    sub_distance_unit       varchar(50),
-
-
-    sub_weight              decimal(20, 2),
-    sub_weight_pricing      decimal(20, 2),
-    sub_weight_unit         varchar(50),
-
-    created_by              varchar(255) REFERENCES User (user_id),
-    created_at              DATETIME            NOT NULL,
-    updated_by              varchar(255) REFERENCES User (user_id),
-    updated_at              DATETIME
-);
-
-CREATE TABLE COURIER_ORDER
-(
-    order_id                    varchar(255)   NOT NULL PRIMARY KEY,
-    order_no                    varchar(255)   NOT NULL UNIQUE,
-    order_type                  varchar(255)   NOT NULL,
-    order_status                varchar(100),
-    tracking_no                 varchar(255)   NOT NULL UNIQUE,
-
-    sender_name                 varchar(255)   NOT NULL,
-    sender_mobile_no            varchar(100)   NOT NULL,
-    sender_email                varchar(255),
-    sender_address              varchar(255)   NOT NULL,
-    sender_city                 varchar(255)   NOT NULL,
-    sender_state                varchar(255)   NOT NULL,
-    sender_postcode             varchar(255)   NOT NULL,
-    sender_latitude             varchar(255)   NOT NULL,
-    sender_longitude            varchar(255)   NOT NULL,
-    sender_formatted_address    varchar(255)   NOT NULL,
-
-    recipient_name              varchar(255)   NOT NULL,
-    recipient_mobile_no         varchar(100)   NOT NULL,
-    recipient_email             varchar(255),
-    recipient_address           varchar(255)   NOT NULL,
-    recipient_city              varchar(255)   NOT NULL,
-    recipient_state             varchar(255)   NOT NULL,
-    recipient_postcode          varchar(255)   NOT NULL,
-    recipient_latitude          varchar(255)   NOT NULL,
-    recipient_longitude         varchar(255)   NOT NULL,
-    recipient_formatted_address varchar(255)   NOT NULL,
-
-    item_qty                    int            NOT NULL,
-    item_type                   varchar(100)   NOT NULL,
-    item_weight                 decimal(20, 3) NOT NULL,
-
-    vehicle_type                varchar(100)   NOT NULL,
-    shipping_cost               decimal(20, 2) NOT NULL,
-    payment_method              varchar(100)   NOT NULL,
-
-    proof_id                    varchar(255),
-    route_id                    varchar(255),
-    sort_id                     int,
-
-    is_picked_up                tinyint(1),
-    pickup_order_status         varchar(100),
-    pickup_proof_id             varchar(255),
-    pickup_sort_id              int,
-    pickup_route_id             varchar(255),
-
-    created_by                  varchar(255) REFERENCES User (user_id),
-    created_at                  DATETIME       NOT NULL,
-    updated_by                  varchar(255) REFERENCES User (user_id),
-    updated_at                  DATETIME,
-    estArriveTime               int
-);
-
-CREATE TABLE ROUTE_REPORT
-(
-    route_report_id            varchar(255) NOT NULL PRIMARY KEY,
-
-    actual_petrol_fees         decimal(20, 2),
-
-    calculated_distance_travel decimal(20, 3),
-    calculated_petrol_fees     decimal(20, 2),
-    calculated_petrol_usage    decimal(20, 3),
-    latest_petrol_price        decimal(20, 2),
-
-    statement                  varchar(255),
-    total_items_qty            integer      NOT NULL,
-    route_id                   varchar(255) NOT NULL,
-
-    created_by                 varchar(255) REFERENCES User (user_id),
-    created_at                 DATETIME     NOT NULL,
-    updated_by                 varchar(255) REFERENCES User (user_id),
-    updated_at                 DATETIME
-);
-
-CREATE TABLE ORDER_ROUTES
-(
-    route_id        varchar(255) NOT NULL PRIMARY KEY,
-
-    departure_point INT          NOT NULL,
-    departure_date  DATETIME     NOT NULL,
-    departure_time  DATETIME     NOT NULL,
-
-    personnel       varchar(255) NOT NULL,
-    status          varchar(255) NOT NULL,
-
-    time_needed     decimal(20, 2),
-    total_distance  decimal(20, 3),
-    vehicle_id      varchar(255) REFERENCES VEHICLE (vehicle_id),
-
-    started_at      DATETIME,
-    created_by      varchar(255) REFERENCES User (user_id),
-    created_at      DATETIME     NOT NULL,
-    updated_by      varchar(255) REFERENCES User (user_id),
-    updated_at      DATETIME
-);
-
-CREATE TABLE TEMP_ORDER_ROUTES
-(
-    order_no varchar(255) NOT NULL PRIMARY KEY,
-    route_id varchar(255) NOT NULL,
-    sort_id  int          NOT NULL UNIQUE
-);
-
-CREATE TABLE COMPANY_ADDRESSES
-(
-    id                int          NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    address           varchar(255) NOT NULL,
-    city              varchar(255) NOT NULL,
-    state             varchar(255) NOT NULL,
-    postcode          varchar(255) NOT NULL,
-    latitude          varchar(255) NOT NULL,
-    longitude         varchar(255) NOT NULL,
-    formatted_address varchar(255) NOT NULL
-);
-
-CREATE TABLE TASK_PROOF
-(
-    proof_id             varchar(255) NOT NULL PRIMARY KEY,
-    courier_personnel_id varchar(255) NOT NULL,
-
-    signature            varchar(255),
-    status               varchar(100) NOT NULL,
-    reason               varchar(255),
-
-    picked_at            datetime     NOT NULL,
-    received_at          datetime     NOT NULL,
-
-    recipient_name       varchar(255),
-    recipient_ic_no      varchar(100),
-
-    arrived_at           DATETIME     NOT NULL,
-
-    created_by           varchar(255) REFERENCES User (user_id),
-    created_at           DATETIME     NOT NULL,
-    updated_by           varchar(255) REFERENCES User (user_id),
-    updated_at           DATETIME
+    proof_id             varchar(255) not null
+        primary key,
+    courier_personnel_id varchar(255) not null,
+    signature            varchar(255) null,
+    signature_path       varchar(100) null,
+    status               varchar(100) not null,
+    reason               varchar(255) null,
+    picked_at            datetime     null,
+    received_at          datetime     null,
+    recipient_name       varchar(255) null,
+    recipient_ic_no      varchar(100) null,
+    arrived_at           datetime     not null,
+    created_by           varchar(255) null,
+    created_at           datetime     not null,
+    updated_by           varchar(255) null,
+    updated_at           datetime     null,
+    constraint task_proof_user_user_id_fk
+        foreign key (courier_personnel_id) references user (user_id)
 );
