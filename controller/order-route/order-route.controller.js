@@ -226,17 +226,17 @@ updateOrderRoute = async (req, res) => {
             };
 
             let promises = [];
+
             for (let i in courierOrder) {
                 let newPromise = await CourierOrder.update({
-                    sortId: +i + 1,
+                    sortId: (+i + 1),
                     routeId: routeId
                 }, {
-                    where: {routeId: routeId},
-                    transaction: transaction
+                    where: {orderNo: courierOrder[i].orderNo},
+                    transaction:transaction
                 });
                 promises.push(newPromise);
             }
-
             await updateRouteReport(data, transaction, res);
             await CourierOrder.update({
                     routeId: null,
@@ -250,7 +250,9 @@ updateOrderRoute = async (req, res) => {
                     transaction: transaction
                 }
             );
+
             await Promise.all(promises);
+
             await transaction.commit();
 
             return res.json(statusModel.success("Order route has been updated."));

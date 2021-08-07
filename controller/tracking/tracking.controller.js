@@ -53,10 +53,14 @@ findAllByTrackingOrderNo = async (req, res) => {
                     raw: true
                 });
             } else if (courierOrder.isPickedUp) {
-                pickUpRouteId = courierOrder.routeId;
+
+                pickUpRouteId = courierOrder.pickupRouteId;
+                if(courierOrder.routeId != null && courierOrder.routeId !== ''){
+                    pickUpRouteId = courierOrder.routeId;
+                }
                 pickupOrderRoute = await OrderRoute.findOne({
                     where: {
-                        routeId: courierOrder.routeId
+                        routeId: pickUpRouteId
                     },
                     raw: true
                 });
@@ -238,7 +242,7 @@ getTotalEstTime = (startTime, sortedCourierOrder, courierOrder) => {
     let arrivalDateTime
 
     if (startTime >= breakTime) { // After 12-1pm then start the route
-        
+
         for (let i in sortedCourierOrder) {
                 // console.log(sortedCourierOrder[i]);
             if (sortedCourierOrder[i].orderNo !== courierOrder.orderNo) {
