@@ -53,10 +53,10 @@ findAllByTrackingOrderNo = async (req, res) => {
                     raw: true
                 });
             } else if (courierOrder.isPickedUp) {
-                pickUpRouteId = courierOrder.pickupRouteId;
+                pickUpRouteId = courierOrder.routeId;
                 pickupOrderRoute = await OrderRoute.findOne({
                     where: {
-                        routeId: courierOrder.pickupRouteId
+                        routeId: courierOrder.routeId
                     },
                     raw: true
                 });
@@ -81,11 +81,9 @@ findAllByTrackingOrderNo = async (req, res) => {
                     raw: true
                 });
                 orderComingAt = pickupOrderRoute.startedAt;
-                console.log(orderComingAt.toLocaleString());
                 if (pickupOrderRoute.status === OrderStatusConstant.IN_PROGRESS) {
                     step = 2;
                     orderEstComingAt = getTotalEstTime(orderComingAt, sortedCourierOrder, courierOrder);
-                    console.log(orderEstComingAt.toLocaleString());
 
                 }
                 if (pickUpTaskProof) {
@@ -240,7 +238,9 @@ getTotalEstTime = (startTime, sortedCourierOrder, courierOrder) => {
     let arrivalDateTime
 
     if (startTime >= breakTime) { // After 12-1pm then start the route
+        
         for (let i in sortedCourierOrder) {
+                // console.log(sortedCourierOrder[i]);
             if (sortedCourierOrder[i].orderNo !== courierOrder.orderNo) {
                 totalEstArriveTime = totalEstArriveTime + sortedCourierOrder[i].estArriveTime;
             } else {
